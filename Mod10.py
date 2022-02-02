@@ -36,7 +36,7 @@ def hello (nome) :
     
 def is_empty(a):
     # Ritorna True se è vuoto
-    return len(a) == 0
+    return a == set()
 
 def checknome (nome) :
     # Ritorno la stringa pulita da caratteri che non ci devono essere
@@ -214,7 +214,7 @@ try:
                 errdescr = errdescr + riga + "->Errore Provincia Nascita: " + prvnascita + "\n "
         
         datanascita = sheet['E'+str(i)].value
-        if is_empty(str(datanascita)) : 
+        if is_empty(datanascita) : 
             errore = True
             errdescr = errdescr + riga + "->Data di Nascita vuota\n "
         else :
@@ -332,7 +332,7 @@ try:
                 errdescr = errdescr + riga + "->Errore Titolo di Studio: " + titolostudio + "\n "
         
         voto = sheet['P'+str(i)].value
-        if is_empty(str(voto)) : 
+        if is_empty(voto) : 
             errore = True
             errdescr = errdescr + riga + "->Manca il Voto Finale\n "
         else:
