@@ -309,6 +309,9 @@ try:
                 # prendo il codice catastale dal codice fiscale e lo passo alla procedura
                 catasto = CodiceFIscaleFile[11:15]
                 prov = checkcomunenascita(catasto)
+                if is_empty(prov) : 
+                    errore = True
+                    errdescr = errdescr + riga + "->Manca la provincia di nascita\n "
                 sheet['C'+str(i)] = checkcomunenascita(catasto)
                 #print(prov)
             
@@ -355,10 +358,13 @@ try:
     #        salary_cell.value =  salary_cell.value+500
     
     # Visualizzo gli errori in caso ci siano
-    print(Back.RED+Fore.YELLOW+errdescr+Back.RESET+Fore.RESET)
-    
+    if (errore) :
+        print(Back.RED+Fore.YELLOW+errdescr+Back.RESET+Fore.RESET)
+    else :
+        print(Fore.GREEN + "# Nessun errore a vista d'occhio #"+Fore.RESET)
+        
     wb_obj.save(savefile)
-    print(Fore.GREEN + "# scritto file "+savefile+" #")
+    print(Fore.GREEN + "# scritto file "+savefile+" #"+Fore.RESET)
 except Exception as e:
     exception_type, exception_object, exception_traceback = sys.exc_info()
     filename = exception_traceback.tb_frame.f_code.co_filename
