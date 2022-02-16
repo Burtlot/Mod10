@@ -15,28 +15,30 @@ import re
 from codicefiscale import codicefiscale
 import requests
 from requests.exceptions import HTTPError
-from setuptools import setup
+#import setuptools
+#from setuptools import setup
 from datetime import datetime
 
 
-__version__ = "0.1.9 del "+str(datetime.today().strftime('%d-%m-%Y'))
-__annotations__="Controllo i dati prima di inviarli al Settore Tecnico FIGC"
-__package__= "Corretto errore di eliminazione apice"
+#versione = "0.2.0 del "+str(datetime.today().strftime('%d-%m-%Y'))
+versione = "2." + str(datetime.today().strftime('%m%d%S'))+" - (c) "+str(datetime.today().strftime('%Y'))+" - A.I.A.C. Service s.r.l. Unipersonale "
+
+#__annotations__="Controllo i dati prima di inviarli al Settore Tecnico FIGC"
+#__package__= "Corretto errore di eliminazione apice"
 
 
 def release () :
     # Visualizzo la release alla partenza
     #print(Back.BLUE,Fore.WHITE,"Mod10 Rel."+__version__+" - "+__annotations__,Back.RESET+'\n')
-    print(Back.BLUE,Fore.WHITE,"Mod10 Rel."+__version__,Back.RESET+'\n')
+    print(Back.BLUE,Fore.WHITE,"Mod10 Rel."+versione,Back.RESET+'\n')
 
 def hello (nome) :
     # Comunico quale file sto leggendo il numero di righe e colonne
     #print(Back.BLUE,Fore.WHITE,'Leggo il file:',nome,Back.RESET+'\n')
     print(Fore.GREEN,'# Leggo il file:',nome,Back.RESET+' #')
     
-def is_empty(a):
-    # Ritorna True se è vuoto
-    return a == set()
+def printErrore (errdescr) :
+    print(Back.RED+Fore.YELLOW+errdescr+Back.RESET+Fore.RESET)
 
 def checknome (nome) :
     # Ritorno la stringa pulita da caratteri che non ci devono essere
@@ -61,6 +63,12 @@ def charexactly (nome, numchar) :
         return False
     return True
     
+def stringoverflow (nome, numchar) :
+    conta = len(nome)
+    #print(nome,numchar,conta)
+    if (conta > numchar) :
+        return True
+    return False
 
 regex = re.compile(r'([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+')
 
@@ -108,6 +116,7 @@ def checkindirizzo (nome) :
     if nome.find("CONTRADA") >= 0 : return True
     if nome.find("VICOLO") >= 0 : return True
     if nome.find("LOCALITA") >= 0 : return True
+    if nome.find("STRADA") >= 0 : return True
     
     return False
     
@@ -129,7 +138,7 @@ def checkvoto (voto):
         return False
 
 
-def checkcomunenascita(cod_catasto) :
+def urlcomunenascita(cod_catasto) :
     # controllo il comune di nascita risalendo dal codice del catasto del codice fiscale sopratutto per inserire la nazione in caso di stranieri
     try:
         parametri = {"token": "05052021", "cod": cod_catasto}
@@ -141,14 +150,38 @@ def checkcomunenascita(cod_catasto) :
     except Exception as err:
         print(f'Other error occurred: {err}')
 
+def urlprovincianascita(cod_catasto) :
+    # controllo il comune di nascita risalendo dal codice del catasto del codice fiscale sopratutto per inserire la nazione in caso di stranieri
+    try:
+        parametri = {"token": "05052021", "cod": cod_catasto}
+        r = requests.post("http://segreteria.assoallenatori.it/api/cf_prov.php", data=parametri)
+        return r.text.lstrip().upper()
+        #print(r.json())
+    except HTTPError as http_err:
+        print(f'HTTP error occurred: {http_err}')
+    except Exception as err:
+        print(f'Other error occurred: {err}')
+
+def urlprovinciaresidenza(comune) :
+    # controllo il comune di residenza risalendo dal nome del comune così riesco a controllare l'esatta definizione del comune e la provincia corretta
+    try:
+        parametri = {"token": "05052021", "cod": comune}
+        r = requests.post("http://segreteria.assoallenatori.it/api/local_prov.php", data=parametri)
+        return r.text.lstrip().upper()
+        #print(r.json())
+    except HTTPError as http_err:
+        print(f'HTTP error occurred: {http_err}')
+    except Exception as err:
+        print(f'Other error occurred: {err}')
+
 errore = False
 errdescr = ''
 #init(convert=True)
 print("\n")
-
+release()
 #path = input("Inserisci il nome del file xls, ad ex- 70304.xlsx : ")
 if len(sys.argv) < 2 :
-    namefile = input("Inserisci il nome del file xls, ad ex- 70304.xlsx : ")
+    namefile = input("Inserisci il nome del Modello 10 in formato Excel : ")
 else:
     namefile = sys.argv[1];     
 
@@ -161,7 +194,7 @@ if (num_ext < 0) : namefile = namefile + '.xlsx'
 savefile = namefile.replace(".xlsx", "_checked.xlsx")
 #input_col_name = input("Enter colname, ex- Endpoint : ")
 try:
-    release()
+    #release()
         
     print(Fore.RESET)
     #Apro il file Excel
@@ -184,187 +217,136 @@ try:
     
     # Leggo riga per riga partendo dalla seconda lascio stare le intestazioni
     for i in range(2, max_row+1):
-        errore = False
+        #errore = False
         riga = str(i)
         
+        # COGNOME
         cognome = sheet['A'+str(i)].value
-        if is_empty(cognome) : 
-            errore = True
-            errdescr = errdescr + riga + "->Cognome vuoto\n "
-        else:
-            sheet['A'+str(i)] = checknome(cognome)        
-        
+        sheet['A'+str(i)] = checknome(cognome)        
+        # NOME
         nome = sheet['B'+str(i)].value
-        if is_empty(nome) : 
-            errore = True
-            errdescr = errdescr + riga + "->Nome vuoto\n "
-        else:
-            sheet['B'+str(i)] = checknome(nome)
-        
+        sheet['B'+str(i)] = checknome(nome)
+        # LUOGO DI NASCITA
         luogonascita = sheet['C'+str(i)].value
         #sheet['C'+str(i)] = checknome(luogonascita)
-        
+        # PROVINCIA DI NASCITA
         prvnascita = sheet['D'+str(i)].value
-        if is_empty(prvnascita) : 
+        if not charexactly(prvnascita,2) : 
             errore = True
-            errdescr = errdescr + riga + "->Provincia Nascita vuota\n "
-        else:
-            if not charexactly(prvnascita,2) : 
-                errore = True
-                errdescr = errdescr + riga + "->Errore Provincia Nascita: " + prvnascita + "\n "
-        
+            errdescr = errdescr + riga + "->Errore Provincia Nascita: " + prvnascita + "\n "
+        # DATA DI NASCITA
         datanascita = sheet['E'+str(i)].value
-        if is_empty(datanascita) : 
-            errore = True
-            errdescr = errdescr + riga + "->Data di Nascita vuota\n "
-        else :
-            celldate = sheet['E'+str(i)]
-            #print(celldate.style)
-            nsddmmyyyy=NamedStyle(name="ddmmaaaa-"+str(i), number_format="DD/MM/YYYY")
-            if(celldate.style == "Normale"):
-                celldate.style = nsddmmyyyy
+        celldate = sheet['E'+str(i)]
+        #print(celldate.style)
+        nsddmmyyyy=NamedStyle(name="ddmmaaaa-"+str(i), number_format="DD/MM/YYYY")
+        if(celldate.style == "Normale"):
+            celldate.style = nsddmmyyyy
         
-        #print(Fore.LIGHTGREEN_EX,celldate.value,Fore.RESET)
-        
-        #controllo che l'indirizzo sia completo di VIA PIAZZA ecc. ecc. 
+        #INDIRIZZO        
         indirizzo = sheet['F'+str(i)].value
-        if is_empty(indirizzo) : 
+        #controllo che l'indirizzo sia completo di VIA PIAZZA ecc. ecc. 
+        if not checkindirizzo(indirizzo) : 
+            # Non essendo un errore vincolante tolgo il blocco
+            #errore = True
+            #errdescr = errdescr + riga + "->Errore Controllare Indirizzo: " + indirizzo + "\n "
+            printErrore(riga + "->Errore Controllare Indirizzo: " + indirizzo)
+        #controllo che non superi i 30 caratteri
+        if stringoverflow(indirizzo, 30) : 
             errore = True
-            errdescr = errdescr + riga + "->Indirizzo vuoto\n "
-        else:
-            if not checkindirizzo(indirizzo) : 
-                errore = True
-                errdescr = errdescr + riga + "->Errore Controllare Indirizzo: " + indirizzo + "\n "
-            else :
-                #se l'indirizzo è corretto lo copio
-                sheet['F'+str(i)] = checknome(indirizzo)
-            
+            errdescr = errdescr + riga + "->Errore Lunghezza indirizzo: " + indirizzo + "\n"
+        #se l'indirizzo è corretto lo copio
+        sheet['F'+str(i)] = checknome(indirizzo)
+        # CAP    
         cap = str(sheet['G'+str(i)].value)
-        if is_empty(cap) : 
-            errore = True
-            errdescr = errdescr + riga + "->CAP vuoto\n "
-        else:
-            if not charexactly(str(cap),5) : 
-                errore = True
-                errdescr = errdescr + riga + "->Errore CAP: " + cap + "\n "
-            
+        if not charexactly(str(cap),5) : 
+            #errore = True
+            #errdescr = errdescr + riga + "->Errore CAP: " + cap + "\n "
+            printErrore(riga + "->Errore Controllare CAP: " + cap)
+        # LUOGO DI RESIDENZA    
         luogoresidenza = sheet['H'+str(i)].value
-        if is_empty(luogoresidenza) : 
-            errore = True
-            errdescr = errdescr + riga + "->Luogo Residenza vuoto\n "
-        else :
-            sheet['H'+str(i)] = checknome(luogoresidenza)
+        sheet['H'+str(i)] = checknome(luogoresidenza)
         
-        
+        # PROVINCIA DI RESIDENZA
         provincia = sheet['I'+str(i)].value
-        if is_empty(provincia) : 
+        if not charexactly(provincia,2) : 
             errore = True
-            errdescr = errdescr + riga + "->Provincia vuota\n "
-        else:
-            if not charexactly(provincia,2) : 
+            errdescr = errdescr + riga + "->Errore Provincia Residenza: " + provincia + "\n "
+        else :
+            prvres = urlprovinciaresidenza(luogoresidenza)
+            if (prvres == "ZZ") :
                 errore = True
-                errdescr = errdescr + riga + "->Errore Provincia Residenza: " + provincia + "\n "
+                errdescr = errdescr + riga + "->Provincia di Residenza NON trovata " + luogoresidenza + "\n"
+            else :            
+                sheet['I'+str(i)] = prvres
         
+        # TELEFONO FISSO
         # Azzero il telefono fisso che non serve più
         teldummy = sheet['J'+str(i)].value
         sheet['J'+str(i)] = ""
         
+        # TELEFONO CELLULARE
         cellulare = str(sheet['K'+str(i)].value)
-        if is_empty(cellulare) : 
-            errore = True
-            errdescr = errdescr + riga + "->Cellulare non presente\n "
-        else :
-            sheet['K'+str(i)] = checktelefono(cellulare)
+        sheet['K'+str(i)] = checktelefono(cellulare)
         
-        
+        #INDIRIZZO EMAIL
         emailaddress = sheet['L'+str(i)].value
-        if is_empty(emailaddress) : 
+        if not isValidMail(emailaddress) :
             errore = True
-            errdescr = errdescr + riga + "->Manca indirizzo EMail\n "
-        else:
-            if not isValidMail(emailaddress) :
-                errore = True
-                errdescr = errdescr + riga + "->Errore Indirizzo EMail: " + emailaddress + "\n "
-            
+            errdescr = errdescr + riga + "->Errore Indirizzo EMail: " + emailaddress + "\n "
+        
+        # SESSO    
         sesso = sheet['O'+str(i)].value
-        if is_empty(sesso) : 
+        if not checksesso(sesso) :
             errore = True
-            errdescr = errdescr + riga + "->Manca sesso\n "
-        else:
-            if not checksesso(sesso) :
-                errore = True
-                errdescr = errdescr + riga + "->Errore Sesso: " + sesso + "\n "
+            errdescr = errdescr + riga + "->Errore Sesso: " + sesso + "\n "
         
+        # CODICE FISCALE
         CodiceFIscaleFile = sheet['M'+str(i)].value
-        if is_empty(CodiceFIscaleFile) : 
+        CFValid = codicefiscale.is_valid(CodiceFIscaleFile)
+        if(not CFValid) : 
             errore = True
-            errdescr = errdescr + riga + "->Manca il Codice Fiscale\n "
+            #errdescr = errdescr + riga + "->Controllare Codice Fiscale: " + str(CodiceFIscaleFile) + " il calcolo a me risulta: " + str(CFCalcolate) + "\n "
+            errdescr = errdescr + riga + "->Controllare Codice Fiscale: " + str(CodiceFIscaleFile) + "\n "
         else:
-            CFValid = codicefiscale.is_valid(CodiceFIscaleFile)
-            if(not CFValid) : 
+            # prendo il codice catastale dal codice fiscale e lo passo alla procedura
+            catasto = CodiceFIscaleFile[11:15]
+            comune = urlcomunenascita(catasto)
+            if (comune == "ZZ") :
                 errore = True
-                #errdescr = errdescr + riga + "->Controllare Codice Fiscale: " + str(CodiceFIscaleFile) + " il calcolo a me risulta: " + str(CFCalcolate) + "\n "
-                errdescr = errdescr + riga + "->Controllare Codice Fiscale: " + str(CodiceFIscaleFile) + "\n "
-            else:
-                # prendo il codice catastale dal codice fiscale e lo passo alla procedura
-                catasto = CodiceFIscaleFile[11:15]
-                prov = checkcomunenascita(catasto)
-                if is_empty(prov) : 
-                    errore = True
-                    errdescr = errdescr + riga + "->Manca la provincia di nascita\n "
-                sheet['C'+str(i)] = checkcomunenascita(catasto)
+                errdescr = errdescr + riga + "->Comune di Nascita NON trovato " + catasto + "\n"
+            else :
+                sheet['C'+str(i)] = comune
+            
+            prov = urlprovincianascita(catasto)
+            if (prov == "ZZ") :
+                errore = True
+                errdescr = errdescr + riga + "->Provincia di Nascita NON trovata " + catasto + "\n"
+            else :            
+                sheet['D'+str(i)] = prov
                 #print(prov)
-            
-        #try:
-        #CFCalcolate = codicefiscale.encode(surname=cognome, name=nome, sex=sesso, birthdate=datanascita, birthplace=luogonascita)
-        #except ValueError as e:
-            #CFCalcolate = ""
-            #pass
-            #CFCalcolate = codicefiscale.decode(CodiceFIscaleFile)
-            #print(CFCalcolate['birthplace'])
-            #raise ValueError("[codicefiscale] {}".format(e))
-            #errdescr = errdescr + riga + "->Errore Calcolo CF: " + CFCalcolate['birthplace'] + "\n "    
-            
+                        
+        # TITOLO DI STUDIO   
         titolostudio = sheet['N'+str(i)].value
-        if is_empty(titolostudio) : 
+        if not checkStudio(titolostudio) :
             errore = True
-            errdescr = errdescr + riga + "->Manca il Titolo di Studio\n "
-        else:
-            if not checkStudio(titolostudio) :
-                errore = True
-                errdescr = errdescr + riga + "->Errore Titolo di Studio: " + titolostudio + "\n "
-        
+            errdescr = errdescr + riga + "->Errore Titolo di Studio: " + titolostudio + "\n "
+        # VOTO CONSEGUITO
         voto = sheet['P'+str(i)].value
-        if is_empty(voto) : 
-            errore = True
-            errdescr = errdescr + riga + "->Manca il Voto Finale\n "
-        else:
-            if not checkvoto(voto) :
-                errore = True
-                errdescr = errdescr + riga + "->Controllare Voto: " + str(voto) + "\n "
-        
-        
-        #print(Fore.BLUE,CFCalcolate,CodiceFIscaleFile)
-        
-        #print(Fore.GREEN+riga+Fore.RED+"->"+Fore.CYAN+cognome,nome,luogonascita,prvnascita,datanascita,indirizzo,cap,luogoresidenza,provincia,cellulare,emailaddress,codicefiscale,titolostudio,sesso,voto)
-        
-    #for rowOfCellObject in sheet['A2':'P'+str(max_row)] :
-    #    for cellObj in rowOfCellObject :
-    #        print (Fore.YELLOW+cellObj.coordinate, cellObj.value)
+        if not checkvoto(voto) :
+            #errore = True
+            printErrore(riga + "-> "+cognome+" "+nome+" Controllare Voto: " + str(voto))
+            #errdescr = errdescr + riga + "->Controllare Voto: " + str(voto) + "\n "
     
-    #for j in range(2, 5):
-    #    salary_cell=sheet_obj.cell(row=j,column=2)
-    #    if salary_cell.value > 1500 :
-    #        salary_cell.value =  salary_cell.value+500
-    
+    # FINE CICLO SULLE RIGHE
     # Visualizzo gli errori in caso ci siano
     if (errore) :
         print(Back.RED+Fore.YELLOW+errdescr+Back.RESET+Fore.RESET)
     else :
-        print(Fore.GREEN + "# Nessun errore a vista d'occhio #"+Fore.RESET)
-        
-    wb_obj.save(savefile)
-    print(Fore.GREEN + "# scritto file "+savefile+" #"+Fore.RESET)
+        #print(Fore.GREEN + "# " + Fore.WHITE + "Sembra che non ci siano errori rilevanti" + Fore.GREEN + " #" + Fore.RESET)
+        print("\n" + Fore.WHITE + "Sembra che non ci siano errori bloccanti" + Fore.RESET + "\n")
+        wb_obj.save(savefile)
+        print(Fore.GREEN + "# Scritto file "+savefile+" #"+Fore.RESET + "\n\n")
+    
 except Exception as e:
     exception_type, exception_object, exception_traceback = sys.exc_info()
     filename = exception_traceback.tb_frame.f_code.co_filename
@@ -373,6 +355,3 @@ except Exception as e:
     print("Exception type: ", exception_type)
     print("File Name: ", filename)
     print("Code Line: ", line_number)
-    #print(e)
-    #print (Fore.RED + "Error : The file does not found")
-
